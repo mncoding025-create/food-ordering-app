@@ -1,26 +1,93 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* ===== Design tokens (ดู design/DESIGN-SPEC.md) =====
+   Tailwind v4 ไม่มี tailwind.config — ประกาศ token ใน @theme แล้วใช้เป็นคลาสได้เลย
+   เช่น --color-brand → bg-brand / text-brand / border-brand */
+@theme {
+  /* สีหลัก */
+  --color-brand: #f97316;
+  --color-brand-dark: #c2410c;
+  --color-brand-tint: #ffedd5;
+  --color-brand-soft: #fdba74;
+  --color-brand-text: #9a3412;
+  --color-cream: #fff8f0;
+  --color-ink: #1c1917;
+  --color-muted: #57534e;
+  --color-line: #eadfd0;
+  --color-edge: #d6c9b8;
+  --color-sand: #f5f0e8;
+  --color-input-border: #a8a29e;
+  --color-danger: #b91c1c;
+  --color-danger-bg: #fef2f2;
+  --color-danger-bd: #dc2626;
+  --color-danger-soft: #fca5a5;
+  --color-danger-tint: #fee2e2;
+
+  /* สีสถานะออเดอร์ (bg / fg / bd) */
+  --color-pending-bg: #fef3c7;
+  --color-pending-fg: #92400e;
+  --color-pending-bd: #f59e0b;
+  --color-cooking-bg: #dbeafe;
+  --color-cooking-fg: #1e40af;
+  --color-cooking-bd: #3b82f6;
+  --color-ready-bg: #dcfce7;
+  --color-ready-fg: #166534;
+  --color-ready-bd: #22c55e;
+  --color-done-bg: #e7e5e4;
+  --color-done-fg: #44403c;
+  --color-done-bd: #a8a29e;
+
+  /* สีหมวดอาหาร (พื้นที่รูป) */
+  --color-cat-rice-bg: #ffedd5;
+  --color-cat-rice-fg: #9a3412;
+  --color-cat-noodle-bg: #fef3c7;
+  --color-cat-noodle-fg: #92400e;
+  --color-cat-drink-bg: #e0f2fe;
+  --color-cat-drink-fg: #075985;
+  --color-cat-dessert-bg: #fce7f3;
+  --color-cat-dessert-fg: #9d174d;
+
+  /* รัศมีมุม: ปุ่ม/ช่องกรอก, การ์ด, แผงตะกร้า */
+  --radius-btn: 14px;
+  --radius-card: 20px;
+  --radius-panel: 24px;
+
+  /* เงา */
+  --shadow-card: 0 2px 8px rgba(120, 53, 15, 0.08);
+  --shadow-panel: 0 8px 24px rgba(120, 53, 15, 0.1);
+  --shadow-sheet: 0 -8px 32px rgba(28, 25, 23, 0.25);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --font-sans: var(--font-noto-thai), ui-sans-serif, system-ui, sans-serif;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-cream);
+  color: var(--color-ink);
+  font-size: 18px;
+  line-height: 1.6;
+}
+
+/* focus ring ชัดเจนสำหรับผู้ใช้คีย์บอร์ด */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 3px solid var(--color-brand-dark);
+  outline-offset: 2px;
+}
+
+/* ซ่อน scrollbar ของแถบ chip ที่เลื่อนแนวนอน (ยังเลื่อนได้ตามปกติ) */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }
