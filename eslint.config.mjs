@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // โค้ดที่ Prisma สร้างให้ ไม่ต้อง lint
+    "generated/**",
   ]),
 ]);
 

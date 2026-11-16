@@ -1,0 +1,11 @@
+// Prisma schema ของ Food Ordering App
+// ที่อยู่ฐานข้อมูลตั้งใน prisma.config.ts (อ่านจาก env) ไม่ได้เขียนไว้ที่นี่
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+}
