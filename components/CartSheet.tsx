@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { ShoppingCart, X } from "lucide-react";
 import CartPanel, { type CartPanelProps } from "./CartPanel";
 import { formatBaht } from "@/lib/format";
@@ -14,6 +14,12 @@ export default function CartSheet(props: CartPanelProps) {
   const sheetRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+
+  // Next 16 + cacheComponents ซ่อนหน้าด้วย <Activity> แทนการ unmount
+  // ปิด sheet ตอนหน้าถูกซ่อน กลับมาแล้วจะได้ไม่เจอ sheet เปิดค้าง
+  useLayoutEffect(() => {
+    return () => setOpen(false);
+  }, []);
 
   useEffect(() => {
     if (!open) return;

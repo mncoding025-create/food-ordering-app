@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { RefreshCw, UtensilsCrossed } from "lucide-react";
 import CartPanel, { type CartLine, type CartPanelProps } from "@/components/CartPanel";
@@ -86,15 +86,43 @@ export default function MenuClient({ intro }: { intro: React.ReactNode }) {
         customerName,
         lines.map((line) => ({ foodId: line.food.id, quantity: line.quantity })),
       );
+      // ล้างตะกร้าและฟอร์มทันที เพื่อให้กลับมาสั่งออเดอร์ถัดไปได้
+      // (ตะกร้าว่าง → ปุ่มยืนยัน disabled เอง จึงยังกดซ้ำระหว่างเปลี่ยนหน้าไม่ได้)
       clearCart();
+      setCustomerName("");
+      setNameTouched(false);
+      setSubmitError(null);
       router.push(`/track?no=${encodeURIComponent(order.orderNumber)}`);
-      // ไม่ปลด submitting เพื่อกันกดซ้ำระหว่างเปลี่ยนหน้า
     } catch (error) {
       setSubmitError(error instanceof Error ? error.message : "ส่งออเดอร์ไม่สำเร็จ กรุณาลองใหม่");
+    } finally {
+      // ปลดสถานะ "กำลังส่ง" เสมอ ทั้งกรณีสำเร็จและล้มเหลว
       submittingRef.current = false;
       setSubmitting(false);
     }
   }
+
+  // Next 16 + cacheComponents ไม่ unmount หน้าตอนเปลี่ยน route แต่ซ่อนไว้ด้วย React <Activity>
+  // state ของหน้านี้จึงยังอยู่เมื่อกลับมา → รีเซ็ตสถานะ "กำลังส่ง" ตอนหน้าถูกซ่อน (cleanup ของ useLayoutEffect)
+  // ดู node_modules/next/dist/docs/01-app/02-guides/preserving-ui-state.md
+  useLayoutEffect(() => {
+    return () => {
+      submittingRef.current = false;
+      setSubmitting(false);
+    };
+  }, []);
+
+  // กันอีกชั้น: เบราว์เซอร์กู้หน้าจาก bfcache (กด Back หลังออกจากเว็บ) จะไม่รัน React ใหม่
+  useEffect(() => {
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) {
+        submittingRef.current = false;
+        setSubmitting(false);
+      }
+    };
+    window.addEventListener("pageshow", onPageShow);
+    return () => window.removeEventListener("pageshow", onPageShow);
+  }, []);
 
   const cartProps: CartPanelProps = {
     lines,

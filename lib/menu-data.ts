@@ -1,6 +1,7 @@
 // เมนูจำลองทั้งหมดอยู่ในไฟล์นี้ไฟล์เดียว
 // เฟสถัดไปจะใช้ข้อมูลชุดนี้สร้าง seed SQL ใส่ฐานข้อมูล
-// ถ้ามีรูปจริง: วางไฟล์ไว้ที่ public/images/ แล้วเพิ่ม imageUrl: "/images/ชื่อไฟล์.jpg"
+// รูปเมนูอยู่ที่ public/images/ แล้วอ้างด้วย imageUrl: "/images/ชื่อไฟล์.svg" (หรือ .jpg)
+// ถ้าไม่มี imageUrl หรือโหลดรูปไม่ได้ การ์ดจะแสดงไอคอนหมวดแทน
 import type { Category, Food } from "./types";
 
 export const categories: Category[] = [
@@ -18,6 +19,7 @@ export const foods: Food[] = [
     description: "กะเพราหมูสับผัดพริกกระเทียม หอมใบกะเพรา เสิร์ฟพร้อมไข่ดาวกรอบ",
     price: 60,
     imageEmoji: "🍛",
+    imageUrl: "/images/kra-pao-moo-sub-khai-dao.svg",
   },
   {
     id: "F002",
@@ -26,6 +28,7 @@ export const foods: Food[] = [
     description: "ข้าวผัดไฟแรงกับกุ้งสด ไข่ และต้นหอม เสิร์ฟพร้อมมะนาว",
     price: 70,
     imageEmoji: "🍤",
+    imageUrl: "/images/khao-pad-goong.svg",
   },
   {
     id: "F003",
@@ -34,6 +37,7 @@ export const foods: Food[] = [
     description: "ไก่ต้มนุ่ม ข้าวมันหอม พร้อมน้ำจิ้มเต้าเจี้ยวและซุปฟัก",
     price: 55,
     imageEmoji: "🍗",
+    imageUrl: "/images/khao-man-gai.svg",
   },
   {
     id: "F004",
@@ -42,6 +46,7 @@ export const foods: Food[] = [
     description: "น้ำซุปเข้มข้นสูตรเรือ เส้นเล็ก หมูเปื่อย ลูกชิ้น และผักบุ้ง",
     price: 50,
     imageEmoji: "🍜",
+    imageUrl: "/images/kuay-teow-ruea-moo.svg",
   },
   {
     id: "F005",
@@ -50,6 +55,7 @@ export const foods: Food[] = [
     description: "เส้นจันท์ผัดซอสมะขาม กุ้งสด เต้าหู้ ถั่วงอก และถั่วลิสง",
     price: 70,
     imageEmoji: "🍝",
+    imageUrl: "/images/pad-thai-goong-sod.svg",
   },
   {
     id: "F006",
@@ -58,6 +64,7 @@ export const foods: Food[] = [
     description: "เส้นใหญ่ผัดซีอิ๊ว ราดน้ำผักคะน้าข้นหอม พร้อมหมูนุ่ม",
     price: 60,
     imageEmoji: "🥢",
+    imageUrl: "/images/rad-na-sen-yai-moo.svg",
   },
   {
     id: "F007",
@@ -66,6 +73,7 @@ export const foods: Food[] = [
     description: "ชาไทยชงเข้ม หวานมัน ใส่นมสดและน้ำแข็ง",
     price: 35,
     imageEmoji: "🧋",
+    imageUrl: "/images/cha-thai-yen.svg",
   },
   {
     id: "F008",
@@ -74,6 +82,7 @@ export const foods: Food[] = [
     description: "กาแฟโรบัสต้าคั่วเข้ม ผสมนมข้น หอมกลมกล่อม",
     price: 40,
     imageEmoji: "☕",
+    imageUrl: "/images/ka-fae-yen.svg",
   },
   {
     id: "F009",
@@ -82,6 +91,7 @@ export const foods: Food[] = [
     description: "มะพร้าวน้ำหอมปั่นเนื้อละเอียด สดชื่น หวานธรรมชาติ",
     price: 45,
     imageEmoji: "🥥",
+    imageUrl: "/images/nam-ma-prao-pun.svg",
   },
   {
     id: "F010",
@@ -90,6 +100,7 @@ export const foods: Food[] = [
     description: "มะม่วงน้ำดอกไม้สุกหวาน ข้าวเหนียวมูน ราดกะทิสด",
     price: 80,
     imageEmoji: "🥭",
+    imageUrl: "/images/khao-niao-ma-muang.svg",
   },
   {
     id: "F011",
@@ -98,6 +109,7 @@ export const foods: Food[] = [
     description: "บัวลอยแป้งนุ่มในน้ำกะทิอุ่นๆ พร้อมไข่หวาน",
     price: 40,
     imageEmoji: "🍡",
+    imageUrl: "/images/bua-loy-khai-wan.svg",
   },
   {
     id: "F012",
@@ -106,5 +118,6 @@ export const foods: Food[] = [
     description: "ไอศกรีมกะทิสด โรยถั่วลิสงคั่ว และข้าวเหนียว",
     price: 35,
     imageEmoji: "🍨",
+    imageUrl: "/images/i-tim-ka-ti.svg",
   },
 ];
