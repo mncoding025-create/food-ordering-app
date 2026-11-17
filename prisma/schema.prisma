@@ -1,5 +1,11 @@
 // Prisma schema ของ Food Ordering App
 // ที่อยู่ฐานข้อมูลตั้งใน prisma.config.ts (อ่านจาก env) ไม่ได้เขียนไว้ที่นี่
+//
+// ⚠️ ฐานข้อมูลเป็นเซิร์ฟเวอร์กลาง (MariaDB) ใช้ร่วมกับเพื่อนหลายคน
+//    ห้ามรัน `prisma migrate`, `prisma db push`, `prisma db pull` เด็ดขาด
+//    ตารางสร้างจาก db/schema_026.sql และใส่ข้อมูลตั้งต้นจาก db/seed_026.sql เท่านั้น
+//    ไฟล์นี้ใช้สำหรับ `prisma generate` (สร้าง type + client) อย่างเดียว
+//    CHECK constraint อยู่ใน SQL เท่านั้น Prisma ไม่รู้จัก — ถ้าแก้โครงสร้างให้แก้ทั้งสองที่ให้ตรงกัน
 
 generator client {
   provider = "prisma-client"
@@ -8,4 +14,77 @@ generator client {
 
 datasource db {
   provider = "mysql"
+}
+
+// ต้องตรงกับ OrderStatus / STATUS_FLOW ใน lib/order-status.ts
+enum OrderStatus {
+  PENDING
+  PREPARING
+  READY
+  COMPLETED
+}
+
+model Category {
+  id        String   @id @db.VarChar(20)
+  name      String   @db.VarChar(100)
+  sortOrder Int      @default(0) @map("sort_order") @db.UnsignedSmallInt
+  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(0)
+
+  foods Food[]
+
+  @@map("category_026_tb")
+}
+
+model Food {
+  id          String   @id @db.VarChar(10)
+  categoryId  String   @map("category_id") @db.VarChar(20)
+  name        String   @db.VarChar(150)
+  description String   @default("") @db.VarChar(500)
+  price       Decimal  @db.Decimal(10, 2)
+  imageUrl    String?  @map("image_url") @db.VarChar(255)
+  imageEmoji  String?  @map("image_emoji") @db.VarChar(16)
+  isAvailable Boolean  @default(true) @map("is_available")
+  sortOrder   Int      @default(0) @map("sort_order") @db.UnsignedSmallInt
+  createdAt   DateTime @default(now()) @map("created_at") @db.DateTime(0)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.DateTime(0)
+
+  category   Category    @relation(fields: [categoryId], references: [id], onUpdate: Cascade, onDelete: Restrict, map: "fk_food_category_026")
+  orderItems OrderItem[]
+
+  @@index([categoryId, isAvailable], map: "idx_food_category_026")
+  @@map("food_026_tb")
+}
+
+// id = เลขออเดอร์ (แสดงในแอปเป็น FO-0001)
+model Order {
+  id           Int         @id @default(autoincrement()) @db.UnsignedInt
+  customerName String      @map("customer_name") @db.VarChar(50)
+  status       OrderStatus @default(PENDING)
+  totalPrice   Decimal     @map("total_price") @db.Decimal(10, 2)
+  createdAt    DateTime    @default(now()) @map("created_at") @db.DateTime(0)
+  updatedAt    DateTime    @default(now()) @updatedAt @map("updated_at") @db.DateTime(0)
+
+  items OrderItem[]
+
+  @@index([status, createdAt], map: "idx_order_status_026")
+  @@index([createdAt], map: "idx_order_created_026")
+  @@map("order_026_tb")
+}
+
+// foodName / unitPrice เป็น snapshot ณ ตอนสั่ง
+model OrderItem {
+  id        Int     @id @default(autoincrement()) @db.UnsignedInt
+  orderId   Int     @map("order_id") @db.UnsignedInt
+  foodId    String  @map("food_id") @db.VarChar(10)
+  foodName  String  @map("food_name") @db.VarChar(150)
+  unitPrice Decimal @map("unit_price") @db.Decimal(10, 2)
+  quantity  Int     @db.UnsignedSmallInt
+  lineTotal Decimal @map("line_total") @db.Decimal(10, 2)
+
+  order Order @relation(fields: [orderId], references: [id], onUpdate: Cascade, onDelete: Cascade, map: "fk_order_item_order_026")
+  food  Food  @relation(fields: [foodId], references: [id], onUpdate: Cascade, onDelete: Restrict, map: "fk_order_item_food_026")
+
+  @@unique([orderId, foodId], map: "uq_order_item_026")
+  @@index([foodId], map: "idx_order_item_food_026")
+  @@map("order_item_026_tb")
 }
