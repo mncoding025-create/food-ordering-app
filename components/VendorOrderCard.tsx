@@ -18,7 +18,7 @@ export default function VendorOrderCard({
   order: Order;
   variant: "kanban" | "card";
   busy: boolean;
-  onAdvance: (orderNumber: string) => void;
+  onAdvance: (order: Order) => void;
 }) {
   const next = nextStatus(order.status);
   const isCard = variant === "card";
@@ -70,7 +70,7 @@ export default function VendorOrderCard({
             disabled={busy}
             aria-busy={busy || undefined}
             aria-label={`เปลี่ยนออเดอร์ ${order.orderNumber} เป็น ${STATUS_META[next].label}`}
-            onClick={() => onAdvance(order.orderNumber)}
+            onClick={() => onAdvance(order)}
             className={`${btnPrimary} w-full px-3 ${isCard ? "h-[52px]" : "h-12"} ${busy ? "disabled:cursor-wait" : ""}`}
           >
             {busy ? (

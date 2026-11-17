@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import Link from "next/link";
-import { Inbox, RefreshCw, RotateCcw } from "lucide-react";
+import { Inbox, RefreshCw } from "lucide-react";
 import EmptyState from "@/components/EmptyState";
 import ErrorMessage from "@/components/ErrorMessage";
 import KanbanBoard from "@/components/KanbanBoard";
@@ -11,7 +11,8 @@ import StatusSummary, { type StatusFilter } from "@/components/StatusSummary";
 import VendorOrderCard from "@/components/VendorOrderCard";
 import ViewToggle from "@/components/ViewToggle";
 import { formatThaiDate } from "@/lib/format";
-import { advanceOrder, resetDemoData, setVendorView } from "@/lib/order-service";
+import { advanceOrder, setVendorView } from "@/lib/order-service";
+import type { Order } from "@/lib/types";
 import { btnOutline, btnPrimary } from "@/lib/ui";
 import { useVendorView } from "@/lib/use-client-store";
 import { useOrders } from "@/lib/use-live-data";
@@ -26,14 +27,14 @@ export default function VendorClient() {
   const [refreshing, setRefreshing] = useState(false);
   const busyRef = useRef(false);
 
-  async function handleAdvance(orderNumber: string) {
+  async function handleAdvance(order: Order) {
     if (busyRef.current) return; // กันกดซ้ำ
     busyRef.current = true;
-    setBusyOrder(orderNumber);
+    setBusyOrder(order.orderNumber);
     setActionError(null);
     try {
-      // กฎลำดับสถานะถูกบังคับใน advanceOrder (ข้ามขั้น/ย้อนกลับไม่ได้)
-      await advanceOrder(orderNumber);
+      // server ตรวจกฎลำดับสถานะซ้ำเสมอ (ข้ามขั้น/ย้อนกลับ/มีคนเปลี่ยนก่อน → 409 พร้อมข้อความไทย)
+      await advanceOrder(order.orderNumber, order.status);
       await refresh();
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "เปลี่ยนสถานะไม่สำเร็จ");
@@ -48,14 +49,6 @@ export default function VendorClient() {
     setRefreshing(true);
     await refresh();
     setRefreshing(false);
-  }
-
-  async function handleReset() {
-    if (!window.confirm("ล้างออเดอร์ทดสอบทั้งหมด และเริ่มเลขออเดอร์ใหม่ที่ FO-0001?")) return;
-    await resetDemoData();
-    setFilter("ALL");
-    setActionError(null);
-    await refresh();
   }
 
   const loading = orders === undefined || view === null;
@@ -88,15 +81,6 @@ export default function VendorClient() {
           >
             <RefreshCw className={`size-5 ${refreshing ? "animate-spin" : ""}`} aria-hidden="true" />
             รีเฟรช
-          </button>
-          {/* ใช้ตอนซ้อม demo เท่านั้น — ลบออกเมื่อต่อฐานข้อมูลจริง */}
-          <button
-            type="button"
-            onClick={handleReset}
-            className="inline-flex h-11 items-center gap-1.5 rounded-btn px-2 text-[15px] font-semibold text-muted underline underline-offset-4 hover:bg-sand hover:text-danger"
-          >
-            <RotateCcw className="size-4" aria-hidden="true" />
-            ล้างข้อมูลทดสอบ
           </button>
         </div>
       </div>

@@ -1,160 +1,145 @@
-// ชั้นบริการ (service) ของออเดอร์ — หน้าต่างๆ เรียกผ่านไฟล์นี้เท่านั้น
-// ตอนนี้เก็บข้อมูลจำลองใน localStorage (ผ่าน lib/storage.ts)
-// เฟสถัดไป: เปลี่ยนเนื้อในฟังก์ชันที่มี TODO(API) เป็น fetch() ไปที่ API จริง
-// โดยไม่ต้องแก้หน้าเว็บ เพราะทุกฟังก์ชันเป็น async อยู่แล้ว
-import { categories, foods } from "./menu-data";
-import { nextStatus, STATUS_META } from "./order-status";
-import { readJSON, readRaw, removeKey, subscribeKey, writeJSON } from "./storage";
-import type { CartItem, Category, Food, Order, OrderItem, VendorView } from "./types";
+// ชั้นบริการ (service) ฝั่ง client — หน้าต่างๆ เรียกผ่านไฟล์นี้เท่านั้น
+// เมนูและออเดอร์: เรียก API ของเรา (app/api/*) ซึ่งคุยกับฐานข้อมูลฝั่ง server
+//   → client ไม่เคยเข้าถึงฐานข้อมูลตรงๆ และไม่ส่งราคาไปให้ server (server ค้นราคาเอง)
+// ตะกร้า / เลขออเดอร์ล่าสุด / มุมมองหน้าร้าน: เก็บในเครื่องลูกค้า (localStorage ผ่าน lib/storage.ts)
+import { MAX_QUANTITY, nextStatus, normalizeOrderNumber, STATUS_LABEL } from "./order-rules";
+import { readJSON, readRaw, subscribeKey, writeJSON } from "./storage";
+import type { CartItem, Category, Food, Order, OrderStatus, VendorView } from "./types";
+
+// ใช้ต่อจากที่เดิมได้ (คอมโพเนนต์เดิม import จากไฟล์นี้)
+export { MAX_QUANTITY, normalizeOrderNumber, validateCustomerName } from "./order-rules";
 
 const KEYS = {
-  orders: "fo:orders",
-  counter: "fo:order-counter",
+  /** สัญญาณ "ข้อมูลออเดอร์เปลี่ยน" ให้แท็บอื่นในเครื่องเดียวกันโหลดใหม่ทันที */
+  ordersPing: "fo:orders-ping",
   recent: "fo:recent-orders",
   cart: "fo:cart",
   vendorView: "fo:vendor-view",
 } as const;
 
-const MAX_QUANTITY = 99;
 const MAX_RECENT = 5;
+const REQUEST_TIMEOUT_MS = 10_000;
 
-/** หน่วงเวลาเล็กน้อยเหมือนเรียกผ่านเครือข่าย ให้เห็นสถานะ loading ตอน demo */
-function delay(ms = 300): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+// ---------- ตัวช่วยเรียก API ----------
 
-/** แปลงสิ่งที่ผู้ใช้พิมพ์ เช่น "7", "fo7", "FO-0007" ให้เป็น "FO-0007" */
-export function normalizeOrderNumber(input: string): string {
-  const trimmed = input.trim().toUpperCase();
-  const digits = trimmed.replace(/^FO-?/, "");
-  if (/^\d{1,6}$/.test(digits)) {
-    return `FO-${digits.padStart(4, "0")}`;
+/** error จาก API (ข้อความเป็นภาษาไทยพร้อมแสดงให้ผู้ใช้) */
+export class ApiRequestError extends Error {
+  constructor(
+    public readonly status: number,
+    message: string,
+  ) {
+    super(message);
+    this.name = "ApiRequestError";
   }
-  return trimmed;
 }
 
-/** ตรวจชื่อลูกค้า คืนข้อความ error ภาษาไทย หรือ null ถ้าผ่าน */
-export function validateCustomerName(name: string): string | null {
-  const trimmed = name.trim();
-  if (trimmed.length === 0) return "กรุณากรอกชื่อก่อนยืนยันออเดอร์";
-  if (trimmed.length < 2) return "ชื่อต้องยาวอย่างน้อย 2 ตัวอักษร";
-  if (trimmed.length > 50) return "ชื่อยาวเกินไป (ไม่เกิน 50 ตัวอักษร)";
-  return null;
+async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  let response: Response;
+  try {
+    response = await fetch(path, {
+      ...init,
+      cache: "no-store",
+      signal: controller.signal,
+      headers: { "Content-Type": "application/json", ...init?.headers },
+    });
+  } catch {
+    // เน็ตหลุด, เซิร์ฟเวอร์ไม่ตอบ, หรือหมดเวลา
+    throw new ApiRequestError(0, "เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ กรุณาตรวจอินเทอร์เน็ตแล้วลองใหม่");
+  } finally {
+    clearTimeout(timer);
+  }
+
+  const body = (await response.json().catch(() => null)) as ({ error?: string } & T) | null;
+  if (!response.ok) {
+    const message =
+      typeof body?.error === "string" ? body.error : "เกิดข้อผิดพลาดในระบบ กรุณาลองใหม่อีกครั้ง";
+    throw new ApiRequestError(response.status, message);
+  }
+  if (body === null) {
+    throw new ApiRequestError(response.status, "ข้อมูลจากเซิร์ฟเวอร์ไม่ถูกต้อง");
+  }
+  return body;
+}
+
+/** บอกแท็บอื่นในเครื่องนี้ว่าออเดอร์เปลี่ยน (เครื่องอื่นจะเห็นผ่านการโพลทุก ~4 วินาที) */
+function pingOrdersChanged(): void {
+  writeJSON(KEYS.ordersPing, Date.now());
 }
 
 // ---------- เมนู ----------
 
 export async function getMenu(): Promise<{ categories: Category[]; foods: Food[] }> {
-  // TODO(API): return (await fetch("/api/menu")).json()
-  await delay();
-  return { categories, foods };
+  return apiFetch("/api/menu");
 }
 
 // ---------- ออเดอร์ ----------
 
-function readOrders(): Order[] {
-  return readJSON<Order[]>(KEYS.orders, []);
-}
-
 export async function createOrder(customerName: string, cartItems: CartItem[]): Promise<Order> {
-  // TODO(API): POST /api/orders { customerName, items: [{ foodId, quantity }] }
-  //            ฝั่ง server ต้องตรวจซ้ำและคำนวณยอดเองเหมือนด้านล่าง
-  await delay(500);
-
-  const nameError = validateCustomerName(customerName);
-  if (nameError) throw new Error(nameError);
-  if (cartItems.length === 0) throw new Error("ตะกร้ายังว่างอยู่ กรุณาเลือกเมนูก่อน");
-
-  // คำนวณราคาจากเมนูเท่านั้น ไม่รับราคา/ยอดรวมจาก client
-  const items: OrderItem[] = cartItems.map((cartItem) => {
-    const food = foods.find((f) => f.id === cartItem.foodId);
-    if (!food) throw new Error("มีเมนูในตะกร้าที่ไม่มีในร้านแล้ว กรุณาลบออกแล้วลองใหม่");
-    const quantity = cartItem.quantity;
-    if (!Number.isInteger(quantity) || quantity < 1 || quantity > MAX_QUANTITY) {
-      throw new Error(`จำนวนของ ${food.name} ไม่ถูกต้อง`);
-    }
-    return { foodId: food.id, foodName: food.name, price: food.price, quantity };
+  // ส่งแค่ foodId + quantity — ราคาและยอดรวมคำนวณที่ server จากฐานข้อมูล
+  const { order } = await apiFetch<{ order: Order }>("/api/orders", {
+    method: "POST",
+    body: JSON.stringify({
+      customerName,
+      items: cartItems.map(({ foodId, quantity }) => ({ foodId, quantity })),
+    }),
   });
-  const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
-  // เลขออเดอร์เรียงต่อเนื่อง FO-0001, FO-0002, ... (ภายหลังใช้ auto increment ของฐานข้อมูล)
-  const counter = readJSON<number>(KEYS.counter, 0) + 1;
-  writeJSON(KEYS.counter, counter);
-
-  const order: Order = {
-    orderNumber: `FO-${String(counter).padStart(4, "0")}`,
-    customerName: customerName.trim(),
-    items,
-    total,
-    status: "PENDING",
-    createdAt: new Date().toISOString(),
-  };
-
-  writeJSON(KEYS.orders, [...readOrders(), order]);
-
-  // จำเลขล่าสุดของเครื่องนี้ไว้ให้กดดูในหน้าติดตามได้ (เก็บในเครื่องต่อไปแม้มี API)
+  // จำเลขล่าสุดของเครื่องนี้ไว้ให้กดดูในหน้าติดตามได้
   const recent = readJSON<string[]>(KEYS.recent, []).filter((n) => n !== order.orderNumber);
   writeJSON(KEYS.recent, [order.orderNumber, ...recent].slice(0, MAX_RECENT));
-
+  pingOrdersChanged();
   return order;
 }
 
+/** ไม่พบ → null (ชื่อลูกค้าที่ได้จะถูกปิดบังบางส่วน เพราะเป็นหน้าสาธารณะ) */
 export async function getOrder(orderNumber: string): Promise<Order | null> {
-  // TODO(API): GET /api/orders/{orderNumber} (404 → null)
-  await delay();
-  const target = normalizeOrderNumber(orderNumber);
-  return readOrders().find((o) => o.orderNumber === target) ?? null;
+  const no = normalizeOrderNumber(orderNumber);
+  try {
+    const { order } = await apiFetch<{ order: Order }>(`/api/orders/${encodeURIComponent(no)}`);
+    return order;
+  } catch (error) {
+    if (error instanceof ApiRequestError && (error.status === 404 || error.status === 400)) {
+      return null;
+    }
+    throw error;
+  }
 }
 
+/** รายการออเดอร์สำหรับหน้าร้าน (ใหม่สุดก่อน) */
 export async function listOrders(): Promise<Order[]> {
-  // TODO(API): GET /api/orders
-  await delay();
-  // ใหม่สุดก่อน
-  return [...readOrders()].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const { orders } = await apiFetch<{ orders: Order[] }>("/api/orders");
+  return orders;
 }
 
 /**
- * เลื่อนสถานะออเดอร์ไปขั้นถัดไป 1 ขั้นเท่านั้น
- * ไม่มีฟังก์ชันตั้งสถานะตรงๆ จึงข้ามขั้นหรือย้อนกลับไม่ได้
+ * เลื่อนสถานะออเดอร์ไปขั้นถัดไป 1 ขั้น
+ * ส่ง "สถานะถัดไป" ที่ UI คาดไว้ ให้ server ตรวจซ้ำตามกฎ (ผิดลำดับ/มีคนเปลี่ยนก่อน → 409 พร้อมข้อความไทย)
  */
-export async function advanceOrder(orderNumber: string): Promise<Order> {
-  // TODO(API): POST /api/orders/{orderNumber}/advance — server เช็กกฎลำดับสถานะซ้ำ
-  await delay();
-  const target = normalizeOrderNumber(orderNumber);
-  const orders = readOrders();
-  const index = orders.findIndex((o) => o.orderNumber === target);
-  if (index === -1) throw new Error(`ไม่พบออเดอร์ ${target}`);
-
-  const current = orders[index];
-  const next = nextStatus(current.status);
+export async function advanceOrder(orderNumber: string, currentStatus: OrderStatus): Promise<Order> {
+  const next = nextStatus(currentStatus);
   if (!next) {
-    throw new Error(`ออเดอร์ ${target} ${STATUS_META[current.status].label}แล้ว เปลี่ยนสถานะต่อไม่ได้`);
+    throw new ApiRequestError(409, `ออเดอร์ ${orderNumber} ${STATUS_LABEL[currentStatus]}แล้ว เปลี่ยนสถานะต่อไม่ได้`);
   }
-
-  const updated: Order = { ...current, status: next };
-  orders[index] = updated;
-  writeJSON(KEYS.orders, orders);
-  return updated;
+  const { order } = await apiFetch<{ order: Order }>(
+    `/api/orders/${encodeURIComponent(orderNumber)}/status`,
+    { method: "PATCH", body: JSON.stringify({ status: next }) },
+  );
+  pingOrdersChanged();
+  return order;
 }
 
-/** ฟังว่าข้อมูลออเดอร์เปลี่ยน (เช่น อีกแท็บสั่งอาหารหรือเปลี่ยนสถานะ) */
+/** ฟังว่าข้อมูลออเดอร์เปลี่ยน (จากแท็บอื่นในเครื่องเดียวกัน) */
 export function subscribeOrders(callback: () => void): () => void {
-  // TODO(API): เปลี่ยนเป็น Server-Sent Events/WebSocket หรือพึ่งการโพลอย่างเดียว
-  return subscribeKey(KEYS.orders, callback);
+  return subscribeKey(KEYS.ordersPing, callback);
 }
 
 export async function getRecentOrderNumbers(): Promise<string[]> {
   return readJSON<string[]>(KEYS.recent, []);
 }
 
-/** ล้างข้อมูลทดสอบทั้งหมด — ใช้ตอนซ้อม demo เท่านั้น (ลบออกเมื่อต่อ API จริง) */
-export async function resetDemoData(): Promise<void> {
-  removeKey(KEYS.counter);
-  removeKey(KEYS.recent);
-  removeKey(KEYS.orders);
-}
-
-// ---------- ตะกร้า (เก็บในเครื่องลูกค้า ไม่ต้องย้ายไป API) ----------
+// ---------- ตะกร้า (เก็บในเครื่องลูกค้า) ----------
 // หน้าเว็บอ่านตะกร้าผ่าน useCart() (lib/use-client-store.ts) ซึ่งใช้ useSyncExternalStore
 // ฝั่ง server จะเห็นตะกร้าว่างเสมอ (EMPTY_CART) จึงไม่เกิด hydration error
 
@@ -165,10 +150,10 @@ function parseCart(raw: string | null): CartItem[] {
   try {
     const parsed = JSON.parse(raw) as CartItem[];
     if (!Array.isArray(parsed)) return EMPTY_CART;
-    // กรองของที่ไม่มีในเมนูแล้วหรือจำนวนผิดรูปแบบทิ้ง
+    // ตรวจแค่รูปแบบข้อมูล — เมนูที่ไม่มีแล้วจะถูกตัดออกตอนจับคู่กับเมนูจาก API และ server ตรวจซ้ำอีกชั้น
     return parsed.filter(
       (item) =>
-        foods.some((f) => f.id === item.foodId) &&
+        typeof item?.foodId === "string" &&
         Number.isInteger(item.quantity) &&
         item.quantity > 0 &&
         item.quantity <= MAX_QUANTITY,
@@ -214,8 +199,6 @@ export function clearCart(): void {
 export function subscribeCart(callback: () => void): () => void {
   return subscribeKey(KEYS.cart, callback);
 }
-
-export { MAX_QUANTITY };
 
 // ---------- ค่าที่ร้านค้าเลือกไว้ (มุมมอง Kanban / การ์ด) ----------
 

@@ -12,7 +12,7 @@ export default function KanbanBoard({
 }: {
   orders: Order[];
   busyOrder: string | null;
-  onAdvance: (orderNumber: string) => void;
+  onAdvance: (order: Order) => void;
 }) {
   return (
     <div className="grid grid-cols-[repeat(auto-fit,minmax(min(260px,100%),1fr))] items-start gap-4">

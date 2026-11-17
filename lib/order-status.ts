@@ -1,28 +1,11 @@
-// กฎลำดับสถานะออเดอร์ + ข้อมูลแสดงผลของแต่ละสถานะ
+// ข้อมูลแสดงผลของแต่ละสถานะ (ไอคอน สี ข้อความสำหรับลูกค้า) — ใช้ฝั่ง UI
+// กฎลำดับสถานะย้ายไปอยู่ที่ lib/order-rules.ts (ใช้ร่วมกับ API ฝั่ง server)
+// re-export ไว้ตรงนี้เพื่อให้คอมโพเนนต์เดิม import ได้เหมือนเดิม
 import { ChefHat, CircleCheck, Clock, Package, type LucideIcon } from "lucide-react";
+import { STATUS_LABEL } from "./order-rules";
 import type { OrderStatus } from "./types";
 
-// ===== กฎลำดับสถานะ (สำคัญ) =====
-// ออเดอร์เดินหน้าได้ทีละขั้นตามลำดับนี้เท่านั้น ห้ามข้ามขั้นและห้ามย้อนกลับ
-// ตอนนี้ order-service เรียกใช้ฟังก์ชัน nextStatus() ฝั่ง client
-// เมื่อมี API แล้ว ต้องเช็กกฎเดียวกันนี้ที่ฝั่ง server ด้วย (อย่าเชื่อค่าจาก client)
-export const STATUS_FLOW: readonly OrderStatus[] = [
-  "PENDING",
-  "PREPARING",
-  "READY",
-  "COMPLETED",
-];
-
-/** คืนสถานะถัดไป หรือ null ถ้าเป็นขั้นสุดท้ายแล้ว */
-export function nextStatus(status: OrderStatus): OrderStatus | null {
-  const index = STATUS_FLOW.indexOf(status);
-  if (index === -1 || index === STATUS_FLOW.length - 1) return null;
-  return STATUS_FLOW[index + 1];
-}
-
-export function statusIndex(status: OrderStatus): number {
-  return STATUS_FLOW.indexOf(status);
-}
+export { STATUS_FLOW, nextStatus, statusIndex } from "./order-rules";
 
 interface StatusMeta {
   label: string;
@@ -43,7 +26,7 @@ interface StatusMeta {
 // เขียนชื่อคลาสเต็มๆ เพื่อให้ Tailwind สแกนเจอ (ห้ามต่อสตริงชื่อคลาสแบบไดนามิก)
 export const STATUS_META: Record<OrderStatus, StatusMeta> = {
   PENDING: {
-    label: "รอดำเนินการ",
+    label: STATUS_LABEL.PENDING,
     icon: Clock,
     bg: "bg-pending-bg",
     fg: "text-pending-fg",
@@ -55,7 +38,7 @@ export const STATUS_META: Record<OrderStatus, StatusMeta> = {
     customerMessage: () => "กำลังรอคิวปรุงอาหาร หน้านี้จะอัปเดตให้อัตโนมัติ",
   },
   PREPARING: {
-    label: "กำลังทำ",
+    label: STATUS_LABEL.PREPARING,
     icon: ChefHat,
     bg: "bg-cooking-bg",
     fg: "text-cooking-fg",
@@ -67,7 +50,7 @@ export const STATUS_META: Record<OrderStatus, StatusMeta> = {
     customerMessage: () => "รอสักครู่ หน้านี้จะอัปเดตให้อัตโนมัติเมื่อสถานะเปลี่ยน",
   },
   READY: {
-    label: "พร้อมรับ",
+    label: STATUS_LABEL.READY,
     icon: CircleCheck,
     bg: "bg-ready-bg",
     fg: "text-ready-fg",
@@ -79,7 +62,7 @@ export const STATUS_META: Record<OrderStatus, StatusMeta> = {
     customerMessage: (no) => `มารับที่หน้าร้านได้เลย แจ้งเลขออเดอร์ ${no} กับพนักงาน`,
   },
   COMPLETED: {
-    label: "เสร็จสิ้น",
+    label: STATUS_LABEL.COMPLETED,
     icon: Package,
     bg: "bg-done-bg",
     fg: "text-done-fg",

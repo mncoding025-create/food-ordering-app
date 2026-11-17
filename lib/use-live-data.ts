@@ -3,7 +3,7 @@
 // hook สำหรับดึงข้อมูลออเดอร์แบบอัปเดตอัตโนมัติ
 // - โหลดครั้งแรกใน useEffect (ไม่อ่าน storage ตอน render จึงไม่เกิด hydration error)
 // - ฟัง event เมื่อข้อมูลเปลี่ยน (อีกแท็บสั่งอาหาร/เปลี่ยนสถานะ)
-// - โพลซ้ำทุก 4 วินาที เผื่อ event หลุด (และใช้ต่อได้เมื่อเปลี่ยนเป็น API จริง)
+// - โพล API ซ้ำทุก 4 วินาที (ออเดอร์จากเครื่องอื่นจะเห็นผ่านทางนี้)
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getOrder, listOrders, subscribeOrders } from "./order-service";
 import type { Order } from "./types";
@@ -45,10 +45,18 @@ function useLiveData<T>(fetcher: () => Promise<T>) {
   useEffect(() => {
     void refresh();
     const unsubscribe = subscribeOrders(() => void refresh());
-    const timer = window.setInterval(() => void refresh(), POLL_MS);
+    // โพลเฉพาะตอนแท็บนี้แสดงอยู่ (ลดภาระฐานข้อมูลกลาง) และโหลดใหม่ทันทีเมื่อกลับมาที่แท็บ
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") void refresh();
+    }, POLL_MS);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void refresh();
+    };
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       unsubscribe();
       window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [refresh]);
 

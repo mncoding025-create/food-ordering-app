@@ -48,7 +48,7 @@ export default function FoodCard({
           <button
             type="button"
             onClick={() => onQuantityChange(1)}
-            className={`${btnPrimary} h-12 w-full px-2 text-[17px]`}
+            className={`${btnPrimary} h-12 w-full whitespace-nowrap text-[17px] max-sm:gap-1 max-sm:px-1.5 max-sm:text-[15px]`}
           >
             <Plus className="size-5 shrink-0" aria-hidden="true" />
             เพิ่มลงตะกร้า
